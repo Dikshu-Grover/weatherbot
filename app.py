@@ -163,7 +163,7 @@ Instructions:
 """
 
         response = co.chat(
-            model="command-r",
+            model="command-r-a",
             messages=[
                 {
                     "role": "user",
