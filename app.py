@@ -1,6 +1,6 @@
 import os
 import requests
-import google.generativeai as genai
+import cohere
 
 from flask import Flask, render_template, request, jsonify
 from dotenv import load_dotenv
@@ -14,15 +14,16 @@ load_dotenv()
 app = Flask(__name__)
 app.secret_key = os.getenv("SECRET_KEY", "weathergpt")
 
-# Gemini API Key
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+# ----------------------------
+# Cohere API
+# ----------------------------
 
-if not GEMINI_API_KEY:
-    raise Exception("GEMINI_API_KEY not found in .env")
+COHERE_API_KEY = os.getenv("COHERE_API_KEY")
 
-genai.configure(api_key=GEMINI_API_KEY)
+if not COHERE_API_KEY:
+    raise Exception("COHERE_API_KEY not found in .env")
 
-model = genai.GenerativeModel("gemini-2.5-flash")
+co = cohere.ClientV2(api_key=COHERE_API_KEY)
 
 
 # ----------------------------
@@ -77,7 +78,6 @@ def home():
 def ask():
 
     try:
-
         data = request.get_json()
 
         city = data.get("city", "").strip()
@@ -108,9 +108,7 @@ def ask():
 
         latitude = location["latitude"]
         longitude = location["longitude"]
-
         city_name = location["name"]
-
         country = location.get("country", "")
 
         # ----------------------------
@@ -140,67 +138,57 @@ def ask():
         condition = weather_description(current["weather_code"])
 
         # ----------------------------
-        # Gemini Prompt
+        # AI Prompt
         # ----------------------------
 
         prompt = f"""
-You are WeatherGPT.
+You are WeatherGPT, a helpful weather assistant.
 
-Current Weather
+Current Weather:
 
 City: {city_name}, {country}
-
 Temperature: {temp}°C
-
 Feels Like: {feels}°C
-
 Humidity: {humidity}%
-
 Wind Speed: {wind} km/h
-
 Condition: {condition}
 
 User Question:
-
 {question}
 
 Instructions:
-
 - Answer naturally.
 - Keep the answer between 3 and 6 sentences.
-- Give useful recommendations whenever possible.
+- Give practical recommendations whenever possible.
 """
 
-        response = model.generate_content(prompt)
+        response = co.chat(
+            model="command-a",
+            messages=[
+                {
+                    "role": "user",
+                    "content": prompt
+                }
+            ]
+        )
+
+        reply = response.message.content[0].text
 
         return jsonify({
-
-            "reply": response.text,
-
+            "reply": reply,
             "weather": {
-
                 "city": city_name,
-
                 "temperature": temp,
-
                 "humidity": humidity,
-
                 "wind": wind,
-
                 "condition": condition
-
             }
-
         })
 
     except Exception as e:
-
         print(e)
-
         return jsonify({
-
             "reply": str(e)
-
         }), 500
 
 
@@ -214,4 +202,3 @@ if __name__ == "__main__":
         port=5000,
         debug=True
     )
-#openmeteo api
